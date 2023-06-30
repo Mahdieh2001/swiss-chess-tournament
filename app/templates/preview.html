@@ -1,0 +1,197 @@
+{% extends "template.html" %}
+
+{% block style&scripts %}
+<style>
+    .styled-table {
+        border-collapse: collapse;
+        margin: 10px;
+        font-size: 0.9em;
+        font-family: sans-serif;
+        min-width: 400px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .styled-table thead tr {
+        background-color: #009879;
+        color: #ffffff;
+        text-align: left;
+    }
+
+    .styled-table th,
+    .styled-table td {
+        padding: 12px 15px;
+    }
+
+    .styled-table tbody tr {
+        border-bottom: 1px solid #dddddd;
+    }
+
+    .styled-table tbody tr:nth-of-type(even) {
+        background-color: #f3f3f3;
+    }
+
+    .styled-table tbody tr:last-of-type {
+        border-bottom: 2px solid #009879;
+    }
+</style>
+<script>
+    var csrf_token = '{% csrf_token %}';
+    var tournamentId = "{{ tournamentId|escape }}";
+    var tournamentName = "{{ tournamentName|escape }}";
+    var sport = "{{ sport|escape }}";
+    var number_of_rounds = "{{ number_of_rounds|escape }}";
+    var players_list = "{{ players_list|escape }}";
+    function back() {
+        theForm = document.createElement('Form');
+        document.body.appendChild(theForm);
+        theForm.method = 'POST';
+        theForm.action = '../tournament/';
+        theForm.innerHTML += csrf_token;
+        for (let item of ['tournamentId', 'tournamentName', 'sport', 'number_of_rounds', 'players_list']) {
+            let input = document.createElement('input');
+            input.type = 'text';
+            input.name = item;
+            input.value = eval(item);
+            theForm.appendChild(input);
+        }
+        theForm.requestSubmit();
+    }
+</script>
+
+<script>
+    function previous() {
+        window.location.replace("{% url 'tournament' tournamentId %}");
+    }
+
+    function remove_match(e) {
+        tr = e.target.parentElement.parentElement;
+        tr.parentElement.removeChild(tr);
+        id1 = tr.children[0].id;
+        id2 = tr.children[3].id;
+        console.log(id1 + " " + id2);
+        document.getElementById(id1).getElementsByTagName('input')[0].disabled = false;
+        document.getElementById(id2).getElementsByTagName('input')[0].disabled = false;
+    }
+
+    function check_number(input) {
+        let re = /^[0-9]?$/;
+        if (re.test(input.value))
+            input.setAttribute('malue', input.value);
+        else
+            input.value = input.getAttribute('malue');
+    }
+
+    function* selected_row() {
+        checkboxes = tbTable.getElementsByTagName('input');
+        for (let chk of checkboxes)
+            if (!chk.disabled && chk.checked)
+                yield chk.parentElement.parentElement;
+    }
+
+    function add_match() {
+        // checkboxes = tbTable.getElementsByTagName('input');
+        let row = selected_row();
+        let row1 = row.next().value;
+        let row2 = row.next().value;
+        if (row2) {
+            row1.getElementsByTagName('input')[0].disabled = true;
+            row2.getElementsByTagName('input')[0].disabled = true;
+            tr = tbMatches.getElementsByTagName('tbody')[0].insertRow(-1);
+            tr.innerHTML = `<td id=${row1.id}>${row1.children[1].innerText}</td>`;
+            tr.innerHTML += `<td nowrap><input type=text size=1 oninput="check_number(this)" required></td>`;
+            tr.innerHTML += `<td nowrap><input type=text size=1 oninput="check_number(this)" required></td>`;
+            tr.innerHTML += `<td id=${row2.id}>${row2.children[1].innerText}</td>`;
+            tr.innerHTML += `<td><a href="#" tabindex=-1 onclick="remove_match(event)" class="remove" title="remove">
+                        &#10006; </a></td>`;
+        }
+    }
+
+    function results() {
+        let result = {}, results = [];
+        for (let tr of tbMatches.getElementsByTagName("tbody")[0].children) {
+            result = {
+                "player1": parseInt(tr.children[0].id),
+                "player2": parseInt(tr.children[3].id),
+                "points1": parseInt(tr.getElementsByTagName("input")[0].value),
+                "points2": parseInt(tr.getElementsByTagName("input")[1].value)
+            }
+            results.push(result);
+        }
+        return results;
+    }
+
+    function next() {
+        // theForm = document.createElement("form");
+        // theForm.csrf_token = '{% csrf_token %}';
+        theForm.csrfmiddlewaretoken = "asfdfa";//'{{ csrf_token }}';
+        theForm.method = "POST";
+        theForm.action = "{% url 'round' 2 2 %}";
+        theForm.results.value = JSON.stringify(results());
+        console.log(theForm);
+        theForm.requestSubmit();
+    }
+
+    function load() {
+        return;
+
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+<p> {% csrf_token %} </p>
+<h1> {{ tournamentName }} {{ sport }} Tournament ({{ number_of_rounds }} rounds) </h1>
+<div style="display: flex; flex-wrap: wrap;">
+    <div>
+        <table id="tbTable" class="styled-table">
+            <thead>
+                <tr>
+                    <td align=center colspan="5"> After 0 Rounds </td>
+                </tr>
+                <tr>
+                    <td>Rank</td>
+                    <td>Name</td>
+                    <td>Points</td>
+                    <td>Rating</td>
+                    <td></td>
+                </tr>
+            </thead>
+            <tbody>
+                {% for participant in participants %}
+                <tr id="{{ participant.player.id }}">
+                    <td>{{ forloop.counter }}</td>
+                    <td id="playerName" nowrap>{{ participant.player }}</td>
+                    <td>0</td>
+                    <td>{{participant.initial_rating}}</td>
+                    <td><input type="checkbox"></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div style="padding:20px 20px;display: flex; align-items: center;">
+        <input type="button" value="Add Match" onclick="add_match()">
+    </div>
+    <div>
+        <form id="theForm" method="POST" action="{% url 'round' 2 1 %}">
+            {% csrf_token %}
+            <input type="hidden" name="results">
+            <table id="tbMatches" class="styled-table">
+                <thead>
+                    <tr>
+                        <td align=center colspan="5"> Matches </td>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </form>
+    </div>
+</div>
+<!-- Participants:
+<ol style="margin:5px;">
+    {% for participant in participants %}
+    <li id="{{ participant.id }}"> {{ participant.player}} (rating: {{participant.initial_rating}})</li>
+    {% endfor %}
+</ol> -->
+{% endblock %}

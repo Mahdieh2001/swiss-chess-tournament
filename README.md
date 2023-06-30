@@ -1,1 +1,2 @@
-# swiss-chess-tournament
+# Swiss System
+A swiss system tournament manager
